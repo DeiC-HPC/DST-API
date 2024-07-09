@@ -1,12 +1,23 @@
 import requests
 import os
+import string
+import secrets
 
 #####STATIC VALUES
 static_url = ""
 
+#Static variables for getting data from the messages
 messageTypePath = "messageType"
 messageIdPath = "messageId"
 dataPath = "data"
+projectNumberPath = "ProjectNo"
+accessIdPath = "AccessIdentifier"
+filesPath = "Files"
+fileIdPath = "FileId"
+
+#Password static variables
+alphabet = string.ascii_letters + string.digits + string.punctuation
+passwordLength = 10
 
 #projects is a dictionary of projects. Each project will contain a list of user-id's
 projects = {}
@@ -17,6 +28,8 @@ projects = {}
 #password: a OTP, password or key connected to the user
 #enabled: a boolean describing whether or not the user is enabled
 users = {}
+
+
 
 #Boolean on whether the result is accepted or not
 def handleMessagePatchResponse(response, msgId):
@@ -55,34 +68,44 @@ def createProject(projectId):
         #create project as an empty list of users
         projects.update(projectId = [])
 
+def removeProjectFolderIfEmpty(projectId)
+    dirEntries = os.listdir(projectId)
+    if(len(dirEntries) == 0):
+       os.rmdir(projectId)
+       return True
+    return False
+
 def deleteProject(projectId):
-       deleted = False
-       if(data.has_key(projectId):
-                #remove project
-                projects.pop(projectId)
-                deleted = True
+    deleted = False
+    if(data.has_key(projectId):
+       #remove project
+       projects.pop(projectId)
+       removeProjectFolderIfEmpty(projectId)
+       deleted = True
 
 def generateUsername(accessId):
     return accesId
 
 def generateOTP():
-    return "Password" #Make this random in some way
+    return ''.join(secrets.choice(alphabet) for i in range(passwordLength))
 
 def createProjectAccess(projectId, accessId):
     if(projects.has_key(projectId)):
-        project = projects.get(projectId)
-        #Create the user in the project
-        if(not accessId in project):
-        project.append(accessId)
-        #Add the user to the list of users
-        if(not users.has_key(accessId)):
-          username = generateUsername(accessId)
-                    password = generateOTP()
-                    enabled = True
-                    users.update(accessId : (projectId, username, password, enabled))
-            #POST credentials
+       project = projects.get(projectId)
+       #Create the user in the project
+       if(not accessId in project):
+           project.append(accessId)
+       #Add the user to the list of users
+       if (not users.has_key(accessId)):
+           username = generateUsername(accessId)
+           password = generateOTP()
+           enabled = True
+           users.update(accessId : (projectId, username, password, enabled))
 
-            ###################TODO
+           #POST credentials back to DST
+           userData = {"accessIdentifier" : accessId, "loginName" : username, "oneTimePassword" : password }
+           url = staticUrl + "/user-accesses"
+           request.post(url, json = userData).raise_for_status()
 
 def deleteProjectAccess(accessId):
     if(users.has_key(accessId)):
@@ -105,27 +128,27 @@ def enableProjectAccess(accessId):
 
 def resetPassword(accessId):
     if(users.has_key(accessId)):
-        (projectId, username, password, enabled) = users.get(accessId)
-        users.update(accessId : (projectId, username, generatePassword(), enabled))
+       (projectId, username, password, enabled) = users.get(accessId)
+       users.update(accessId : (projectId, username, generatePassword(), enabled))
 
-        #Patch to provide new password
+       #PATCH new OTP back to DST
+       url = staticUrl + "/user-accesses/"+accessId
+       request.patch(url, password).raise_for_status()
 
-        ###################TODO
-
+chunkSize = 8192
 def downloadLargeFile(url, destination):
     try:
         with requests.get(url, stream=True) as response:
             response.raise_for_status()
             with open(destination, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
+                for chunk in response.iter_content(chunk_size=chunkSize):
                     f.write(chunk)
-        print("File downloaded successfully!")
     except requests.exceptions.RequestException as e:
         print("Error downloading the file:", e)
 
-
 def sendLargeFile(url, filePath):
-    ################TODO
+    with open(filePath, 'rb') as f:
+       requests.post(url, data=f).raise_for_status()
 
 def handleFileDelivery(projectId, fileId):
     dirc = projectId
@@ -139,8 +162,8 @@ def findFileById(fileId):
         if fileId in files:
             return os.path.join(root, fileId)
 
-def dataDeliveryReady(projectId, fileIds)
-    for fileId in fileIds:
+def dataDeliveryReady(projectId, files)
+    for fileId, fileSize, checksum in files:
         handleFileDelivery(projectId, fileId)
 
 def deleteDataFile(fileId):
@@ -151,64 +174,74 @@ def deleteDataFile(fileId):
 def returnDataFile(fileId):
     optionalFilePath = findFileById(fileId)
     if(optionalFilePath):
-        sendLargeFile(optionalFilePath)
+       url = staticUrl + "/data/" + fileId
+       sendLargeFile(url, optionalFilePath)
+
+def transferFile(filePath, projectNumber)
+    url = staticUrl + "/data/project/" + projectNumber
+    sendLargeFile(url, filePath)
 
 def handleIndividualMessage(messageType, msgId, data):
     match messageType:
         case "CreateProject":
-            projectId = 1337 #Get this
+            projectId = data[projectNumberPath]
             createProject(projectId)
             messageDone(msgId)
+
         case "DeleteProject":
-            projectId = 1337 #Get this
+            projectId = data[projectNumberPath]
             deleteProject(projectId)
-            #return an answer
+            #mark as done
             messageDone(msgId)
+
         case "CreateProjectAccess":
-            projectId = 1337 #Get this
-            accessId = 1337 #Get this
+            projectId = data[projectNumberPath]
+            accessId = data[accessIdPath]
             createProjectAccess(projectId, acessId)
-            #return an answer
+            #mark as done
             messageDone(msgId)
 
         case "DeleteProjectAccess":
-            accessId = 1337 #Get this
+            accessId = data[accessIdPath]
             deleteProjectAccess(accessId)
-            #return an answer
+            #mark as done
             messageDone(msgId)
 
         case "DisableProjectAccess":
-            accessId = 1337 #Get this
+            accessId = data[accessIdPath]
             disableProjectAccess(accessId)
-            #return an answer
+            #mark as done
             messageDone(msgId)
 
         case "EnableProjectAccess":
-            accessId = 1337 #Get this
+            accessId = data[accessIdPath]
             enableProjectAccess(accessId)
-            #return an answer
+            #mark as done
             messageDone(msgId)
 
         case "ResetPassword":
-            accessId = 1337 #Get this
+            accessId = data[accessIdPath]
             resetPassword(accessId)
-            #return an answer
+            #mark as done
             messageDone(msgId)
 
         case "DataDeliveryReady":
-            projectId = 1337 #Get this
-            fileIds = [0,1,2,3] #Get this
-            dataDeliveryReady(projectId, fileIds)
+            projectId = data[projectNumberPath]
+            files = data[filesPath]
+            dataDeliveryReady(projectId, files)
+            #mark as done
             messageDone(msgId)
 
         case "DeleteDataFile":
-            fileId = 0 #Get this
+            fileId = data[fileIdPath]
             deleteDataFile(fileId)
+            #mark as done
             messageDone(msgId)
 
         case "ReturnDataFile":
-            fileId = 0 #Get this
+            fileId = data[fileIdPath]
             returnDataFile(fileId)
+            #mark as done
             messageDone(msgId)
 
         case _:
@@ -227,20 +260,16 @@ def handleMessageList(response):
 
 def handleGetMessageResponse(response)
     match response.status_code
-    case 200:
-        handleMessageList(response)
-        return
-    case 401:
-        print("Unauthorized or wrong API-key for getting message list from DST")
-        print("Please check the api-key")
-        return
-    case 500:
-        print("Internal server error at DST for getting messageList")
-        print("Maybe try again?")
-        return
-    case _:
-        print("Unknown status code: " + response.status_code)
-        return
+       case 200:
+           handleMessageList(response)
+       case 401:
+           print("Unauthorized or wrong API-key for getting message list from DST")
+           print("Please check the api-key")
+       case 500:
+           print("Internal server error at DST for getting messageList")
+           print("Maybe try again?")
+       case _:
+           print("Unknown status code: " + response.status_code)
 
 
 #####Create project
@@ -256,3 +285,15 @@ path = "/messages"
 response = requests.get(url + path)
 
 handleMessageList(response)
+
+#####Send data to project from data-center
+
+#Crteate some data
+f = open("demofile", "w")
+f.write("This is a test")
+f.close()
+
+#Actually do the transfer
+projectId = 1337 #It's not. Is it?
+path = "demofile"
+transferFile(demofile, projectId)
