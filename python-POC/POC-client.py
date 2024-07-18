@@ -2,6 +2,7 @@ import requests
 import os
 import string
 import secrets
+import json
 
 #####STATIC VALUES
 static_url = ""
@@ -59,7 +60,7 @@ def handleMessagePatchResponse(response, msgId):
             return False
 
 def messageDone(msgId):
-    path = "messages/" + msgId
+    path = "/messages/" + msgId
     response = requests.patch(url + path)
     handleMessagePatchResponse(response, msgId)
 
@@ -248,7 +249,7 @@ def handleIndividualMessage(messageType, msgId, data):
             print("Unknown message type: " + messageType)
 
 def getMessageList(response)
-    return []
+    return json.loads(response.content)
 
 def handleMessageList(response):
     messages = getMessageList(response)
@@ -275,8 +276,8 @@ def handleGetMessageResponse(response)
 #####Create project
 projectId = 1337 #Is 42 funnier?
 
-path = "projects/" + projectId + "/confirm"
-reponse = requests.post(url + path)
+path = "/projects/" + str(projectId) + "/confirm"
+response = requests.post(url + path)
 handleMessagePatchResponse(response, projectId)
 
 #####Get messages
