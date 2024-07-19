@@ -25,7 +25,6 @@ var queue []int
 func generateMessage(i int) map[string]any{
 	now := time.Now()
 	dataMap := make(map[string]any)
-	queue = append(queue, messageCount)
 	messageCount += 1
 	var messageType HPCMessageTypeEnum
 	switch i{
@@ -66,7 +65,7 @@ func generateMessage(i int) map[string]any{
 		dataMap["ProjectNo"] = 1337
 
 		var filesMap []map[string]string
-		var file map[string]string
+		file := make(map[string]string)
 		file["FileId"] = "File"
 		file["FileSize"] = "1"
 		file["FileChecksum"] = "0"
@@ -91,12 +90,14 @@ func generateMessage(i int) map[string]any{
 	return message
 }
 
+var MESSAGELISTORDERING []int = []int{0,2,4,5,6,7,8,9,3,1}
+
 func getMessages() []Data{
 	var data []Data
-	for i := 0; i <= 0; i++ {
-		data = append(data, generateMessage(i))
+	for i := 0; i < len(MESSAGELISTORDERING); i++ {
+		queue = append(queue, messageCount)
+		data = append(data, generateMessage(MESSAGELISTORDERING[i]))
 	}
-	//Export data to a queue to hold state
 	return data
 }
 
@@ -127,5 +128,5 @@ func MessagesIdPatch(w http.ResponseWriter, r *http.Request) {
 
 func MessagesPatch(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusNotImplemented)
 }
