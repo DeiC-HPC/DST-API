@@ -100,7 +100,7 @@ var routes = Routes{
 		"ProjectsProjectNoConfirmPost",
 		strings.ToUpper("Post"),
 		"/projects/{projectNo}/confirm",
-		ProjectsProjectNoConfirmPost,
+		ProjectsProjectNumberConfirmPost,
 	},
 
 	// Route{

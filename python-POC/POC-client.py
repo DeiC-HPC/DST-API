@@ -75,8 +75,8 @@ def createProject(projectId):
 def removeProjectFolderIfEmpty(projectId):
     dirEntries = os.listdir(str(projectId))
     if(len(dirEntries) == 0):
-       os.rmdir(str(projectId))
-       return True
+        os.rmdir(str(projectId))
+        return True
     return False
 
 def deleteProject(projectId):
@@ -261,7 +261,7 @@ def handleMessageList(response):
         msgId = message[messageIdPath]
         data = message[dataPath]
         handleIndividualMessage(messageType, msgId, data)
-        printState()
+        printState() #For debugging
 
 def handleGetMessageResponse(response):
     match response.status_code:
