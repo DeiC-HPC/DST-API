@@ -1,4 +1,4 @@
-module go-server-server-generated
+module test-server
 
 go 1.22.5
 

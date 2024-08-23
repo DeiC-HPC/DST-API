@@ -14,6 +14,7 @@ To see how to make this your own, look here:
 
 - API version: v1
 - Build date: 2024-07-16T07:38:52.181480306Z[GMT]
+- swagger-codegen version: 3.0.58
 
 
 ### Running the server

@@ -1,0 +1,65 @@
+POC-client.py is built in a simple manner to show an example of to use the DST swagger API.
+It is not made to be ready-to-use but as a piece of code to guide the development of implementations at the different HPC-centers that want to use the API. It does very little to validate data formats and is not suitable for production. Please use it as an example and not as a solution.
+
+The start of the file contains a set of static values to simplify the implementation, fx. the url to the server, an authorization token using an apikey and the name of several fields in the json-object.
+
+Because projects and users both need to be searchable we have created two dictionaries - one a dict of projects which each contains a list of user-ids, the second a dict of users cotaining certain values pertaining to the user, eg: project-id, username, password and wether or not the user is enabled.
+These two dictionaries are the database of the program.
+
+The bulk of the program contains a series of functions to handle the different functionalities of the API.
+
+The sequential program after these functions goes as follows:
+The project is initialized using initializeProject which sends the confirmProjectNo message to the server and verifies the response.
+After this the program requests a list of messages from the server and handles the response using handleGetMessageResponse.
+handleGetMessageResponse checks the status code and if the status code is 200 as expected the response is passed to handleMessageList.
+handleMessageList parses the content of the response into a python representation of the json-data and then handles each message individually. For each message the message-type, message-id and message-data is retreived and passed to the handleIndividualMessage-function.
+
+handleIndividualMessage is based around a large switch case based on the message-type. For each message-type it retrieves the relevant data and calls the relevant function after which it sends a message to mark the message as done.
+
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+###MAKE THIS PART WHEN WE KNOW THAT THE PROGRAM IS DONE!!!
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+
+messageDone takes in the message-id and sends in a patch-message to the server to mark the specifik message as done and checks the status code of the response. If the response is not as expected then it returns false although nothing is currently done with this value.

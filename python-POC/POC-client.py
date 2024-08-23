@@ -1,11 +1,16 @@
 import requests
+from requests.auth import HTTPBasicAuth
 import os
 import string
 import secrets
 import json
+import time
 
 #####STATIC VALUES
 static_url = "http://localhost:8080"
+
+apikey = ""
+auth = HTTPBasicAuth("apikey", apikey)
 
 #Static variables for getting data from the messages
 messageTypePath = "messageType"
@@ -64,7 +69,7 @@ def handleMessagePatchResponse(response, msgId):
 def messageDone(msgId):
     path = "/messages/" + str(msgId)
     url = static_url + path
-    response = requests.patch(url)
+    response = requests.patch(url, auth=auth)
     handleMessagePatchResponse(response, msgId)
 
 def createProject(projectId):
@@ -109,7 +114,7 @@ def createProjectAccess(projectId, accessId):
             #POST credentials back to DST
             userData = {"accessIdentifier" : accessId, "loginName" : username, "oneTimePassword" : password }
             url = static_url + "/user-accesses"
-            requests.post(url, json = userData).raise_for_status()
+            requests.post(url, auth=auth, json = userData).raise_for_status()
 
 def deleteProjectAccess(accessId):
     if(accessId in users):
@@ -137,12 +142,12 @@ def resetPassword(accessId):
 
         #PATCH new OTP back to DST
         url = static_url + "/user-accesses/" + str(accessId)
-        requests.patch(url, password).raise_for_status()
+        requests.patch(url, password, auth=auth).raise_for_status()
 
 chunkSize = 8192
 def downloadLargeFile(url, destination):
     try:
-        with requests.get(url, stream=True) as response:
+        with requests.get(url, auth=auth, stream=True) as response:
             response.raise_for_status()
             with open(destination, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=chunkSize):
@@ -152,7 +157,7 @@ def downloadLargeFile(url, destination):
 
 def sendLargeFile(url, filePath):
     with open(filePath, 'rb') as f:
-        requests.post(url, data=f).raise_for_status()
+        requests.post(url, auth=auth, data=f).raise_for_status()
 
 def handleFileDelivery(projectId, fileId):
     dirc = str(projectId)
@@ -190,66 +195,51 @@ def handleIndividualMessage(messageType, msgId, data):
         case "CreateProject":
             projectId = data[projectNumberPath]
             createProject(projectId)
-            messageDone(msgId)
 
         case "DeleteProject":
             projectId = data[projectNumberPath]
             deleteProject(projectId)
-            #mark as done
-            messageDone(msgId)
 
         case "CreateProjectAccess":
             projectId = data[projectNumberPath]
             accessId = data[accessIdPath]
             createProjectAccess(projectId, accessId)
-            #mark as done
-            messageDone(msgId)
 
         case "DeleteProjectAccess":
             accessId = data[accessIdPath]
             deleteProjectAccess(accessId)
-            #mark as done
-            messageDone(msgId)
 
         case "DisableProjectAccess":
             accessId = data[accessIdPath]
             disableProjectAccess(accessId)
-            #mark as done
-            messageDone(msgId)
 
         case "EnableProjectAccess":
             accessId = data[accessIdPath]
             enableProjectAccess(accessId)
-            #mark as done
-            messageDone(msgId)
 
         case "ResetPassword":
             accessId = data[accessIdPath]
             resetPassword(accessId)
-            #mark as done
-            messageDone(msgId)
 
         case "DataDeliveryReady":
             projectId = data[projectNumberPath]
             files = data[filesPath]
             dataDeliveryReady(projectId, files)
-            #mark as done
-            messageDone(msgId)
 
         case "DeleteDataFile":
             fileId = data[fileIdPath]
             deleteDataFile(fileId)
-            #mark as done
-            messageDone(msgId)
 
         case "ReturnDataFile":
             fileId = data[fileIdPath]
             returnDataFile(fileId)
-            #mark as done
-            messageDone(msgId)
 
         case _:
             print("Unknown message type: ", messageType)
+            return #To not mark the message as done
+
+    #mark as done
+    messageDone(msgId)
 
 def getMessageList(response):
     return json.loads(response.content)
@@ -261,7 +251,10 @@ def handleMessageList(response):
         msgId = message[messageIdPath]
         data = message[dataPath]
         handleIndividualMessage(messageType, msgId, data)
-        printState() #For debugging
+    #DELETE ME
+    if(len(messages)==0):
+        print("No more messages - goodbye")
+        exit()
 
 def handleGetMessageResponse(response):
     match response.status_code:
@@ -277,20 +270,37 @@ def handleGetMessageResponse(response):
             print("Unknown status code: ", response.status_code)
 
 
+def initializeProject(projectId):
+    path = "/projects/" + str(projectId) + "/confirm"
+    url = static_url + path
+    response = requests.post(url, auth=auth)
+    handleMessagePatchResponse(response, projectId)
+
 #####Create project
 projectId = 1337 #Is 42 funnier?
-
-path = "/projects/" + str(projectId) + "/confirm"
-url = static_url + path
-response = requests.post(url)
-handleMessagePatchResponse(response, projectId)
+initializeProject(projectId)
 
 #####Get messages
 path = "/messages"
+url=static_url+path
+response = requests.get(url, auth=auth)
+handleGetMessageResponse(response)
 
-response = requests.get(static_url + path)
 
-handleMessageList(response)
+### DELETE ME
+i = 0
+while(True):
+    i+=1
+    if(i<50):
+        for x in range(1):
+            initializeProject(projectId+x+i*50)
+    url=static_url+path
+    response = requests.get(url, auth=auth)
+    response = requests.get(url, auth=auth)
+
+    handleGetMessageResponse(response)
+    printState() #For debugging
+    time.sleep(1)
 
 #####Send data to project from data-center
 

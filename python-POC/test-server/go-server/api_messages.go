@@ -16,27 +16,24 @@ import (
 	"strconv"
 )
 
-var MESSAGELISTORDERING []CreateMessage = []CreateMessage{
-	generateCreateProject("1337"),
-	generateCreateProjectAccess("1337","Test"),
-	generateDisableProjectAccess("Test"),
-	generateEnableProjectAccess("Test"),
-	generateResetPassword("Test"),
-	generateDataDeliveryReady(
-		"DeliveryId",
-		"1337",
-		"File",
-		"1",
-		"0"),
-	generateDeleteDataFile("File"),
-	generateReturnDataFile("File"),
-	generateDeleteProjectAccess("Test"),
-	generateDeleteProject("1337")}
+// var MESSAGELISTORDERING []CreateMessage = []CreateMessage{
+// 	generateCreateProject("1337"),
+// 	generateCreateProjectAccess("1337","Test"),
+// 	generateDisableProjectAccess("Test"),
+// 	generateEnableProjectAccess("Test"),
+// 	generateResetPassword("Test"),
+// 	generateDataDeliveryReady(
+// 		"DeliveryId",
+// 		"1337",
+// 		"File",
+// 		"1",
+// 		"0"),
+// 	generateDeleteDataFile("File"),
+// 	generateReturnDataFile("File"),
+// 	generateDeleteProjectAccess("Test"),
+// 	generateDeleteProject("1337")}
 
 func getMessages() []Data{
-	for i := 0; i < len(MESSAGELISTORDERING); i++ {
-		updateMessageQueue(MESSAGELISTORDERING[i])
-	}
 	data := generateMessages()
 	return data
 }
@@ -45,7 +42,6 @@ func MessagesGet(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(getMessages())
-	fmt.Println(confirmQueue)
 }
 
 func MessagesIdPatch(w http.ResponseWriter, r *http.Request) {
@@ -57,13 +53,18 @@ func MessagesIdPatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//Look only for the first message in the confirmQueue
-	if(confirmQueue != nil && confirmQueue[0] == messageId){
+	if(confirmQueue != nil && confirmQueue[0].queue == messageId){
+		nextMessage := confirmQueue[0].nextMessage
+		//If value is nil then the message is not instantiated and we are done in this round
+		if(nextMessage.value != nil){
+			updateMessageQueue(nextMessage)
+		}
 		w.WriteHeader(http.StatusOK)
 		confirmQueue = confirmQueue[1:]
+		messageQueue = messageQueue[1:]
 	} else {
 		w.WriteHeader(http.StatusNotFound)
 	}
-	fmt.Println(confirmQueue)
 }
 
 func MessagesPatch(w http.ResponseWriter, r *http.Request) {
