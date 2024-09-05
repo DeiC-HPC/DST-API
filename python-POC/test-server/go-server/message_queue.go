@@ -44,7 +44,7 @@ var confirmQueue []QueueAndNextMessage
 
 var newMessageQueue []CreateMessage
 
-var messageQueue []Data
+var messageQueue []Data = []Data{}
 
 func updateMessageQueue(msg CreateMessage){
 	newMessageQueue = append(newMessageQueue, msg)
@@ -110,43 +110,43 @@ func generateMessage(msg CreateMessage) Data{
 	switch msg.msgType{
 		case 0:
 		messageType = CREATE_PROJECT
-		dataMap["ProjectNo"] = msg.value //Is 42 funnier?
+		dataMap["projectNo"] = msg.value
 
 		nextMessage = generateCreateProjectAccess("TestUser"+strconv.Itoa(messageCount), msg.value.(string))
 
 		case 1:
 		messageType = DELETE_PROJECT
-		dataMap["ProjectNo"] = msg.value //Maybe 666?
+		dataMap["projectNo"] = msg.value
 
 		case 2:
 		messageType = CREATE_PROJECT_ACCESS
 
-		dataMap["ProjectNo"] = msg.projectNumber
-		dataMap["AccessIdentifier"] = msg.value
+		dataMap["projectNo"] = msg.projectNumber
+		dataMap["accessIdentifier"] = msg.value
 
 		nextMessage = generateDisableProjectAccess(msg.value.(string), msg.projectNumber)
 
 		case 3:
 		messageType = DELETE_PROJECT_ACCESS
-		dataMap["AccessIdentifier"] = msg.value
+		dataMap["accessIdentifier"] = msg.value
 
 		nextMessage = generateDeleteProject(msg.projectNumber)
 
 		case 4:
 		messageType = DISABLE_PROJECT_ACCESS
-		dataMap["AccessIdentifier"] = msg.value
+		dataMap["accessIdentifier"] = msg.value
 
 		nextMessage = generateEnableProjectAccess(msg.value.(string), msg.projectNumber)
 
 		case 5:
 		messageType = ENABLE_PROJECT_ACCESS
-		dataMap["AccessIdentifier"] = msg.value
+		dataMap["accessIdentifier"] = msg.value
 
 		nextMessage = generateResetPassword(msg.value.(string), msg.projectNumber)
 
 		case 6:
 		messageType = RESET_PASSWORD
-		dataMap["AccessIdentifier"] = msg.value
+		dataMap["accessIdentifier"] = msg.value
 
 		nextMessage = generateDataDeliveryReady("Test",msg.projectNumber,"TestFile","1","0", msg.accessIdentifier)
 
@@ -154,29 +154,29 @@ func generateMessage(msg CreateMessage) Data{
 		messageType = DATA_DELIVERY_READY
 		var value FileForDelivery = msg.value.(FileForDelivery)
 
-		dataMap["DataDeliveryId"] = value.deliveryId
-		dataMap["ProjectNo"] = value.projectNumber
+		dataMap["dataDeliveryId"] = value.deliveryId
+		dataMap["projectNo"] = value.projectNumber
 
 		var filesMap []map[string]string
 		file := make(map[string]string)
-		file["FileId"] = value.fileId
-		file["FileSize"] = value.fileSize
-		file["FileChecksum"] = value.checkSum
+		file["fileId"] = value.fileId
+		file["fileSize"] = value.fileSize
+		file["fileChecksum"] = value.checkSum
 		filesMap =append(filesMap, file)
 
-		dataMap["Files"] = filesMap
+		dataMap["files"] = filesMap
 
 		nextMessage = generateReturnDataFile(value.fileId, msg.projectNumber, msg.accessIdentifier)
 
 		case 8:
 		messageType = DELETE_DATA_FILE
-		dataMap["FileId"] = msg.value
+		dataMap["fileId"] = msg.value
 
 		nextMessage = generateDeleteProjectAccess(msg.accessIdentifier, msg.projectNumber)
 
 		default:
 		messageType = RETURN_DATA_FILE
-		dataMap["FileId"] = msg.value
+		dataMap["fileId"] = msg.value
 
 		nextMessage = generateDeleteDataFile(msg.value.(string), msg.projectNumber, msg.accessIdentifier)
 

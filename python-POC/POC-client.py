@@ -7,19 +7,20 @@ import json
 import time
 
 #####STATIC VALUES
-static_url = "http://localhost:8080"
+static_url = "http://srvhpcstg1.fsehpcdmz.local/HPCApiPreprod"
+#static_url = "http://localhost:8080"
 
-apikey = ""
-auth = HTTPBasicAuth("apikey", apikey)
+apikey = "DeiCApiKey"
+headers = {"X-API-Key": apikey}
 
 #Static variables for getting data from the messages
 messageTypePath = "messageType"
 messageIdPath = "messageId"
 dataPath = "data"
-projectNumberPath = "ProjectNo"
-accessIdPath = "AccessIdentifier"
-filesPath = "Files"
-fileIdPath = "FileId"
+projectNumberPath = "projectNo"
+accessIdPath = "accessIdentifier"
+filesPath = "files"
+fileIdPath = "fileId"
 
 #Password static variables
 alphabet = string.ascii_letters + string.digits + string.punctuation
@@ -67,30 +68,40 @@ def handleMessagePatchResponse(response, msgId):
             return False
 
 def messageDone(msgId):
+    return
     path = "/messages/" + str(msgId)
     url = static_url + path
-    response = requests.patch(url, auth=auth)
+    response = requests.patch(url, headers=headers)
     handleMessagePatchResponse(response, msgId)
 
-def createProject(projectId):
+def createProject(msgId, projectId):
     if(not projectId in projects):
         #create project as an empty list of users
         projects.update([(projectId,[])])
+    else:
+        print("Project ", projectId, " already created")
+        print("Contact DST about message: ", msgId)
 
 def removeProjectFolderIfEmpty(projectId):
-    dirEntries = os.listdir(str(projectId))
-    if(len(dirEntries) == 0):
-        os.rmdir(str(projectId))
-        return True
+    if os.path.exists(str(projectId)):
+        dirEntries = os.listdir(str(projectId))
+        if(len(dirEntries) == 0):
+            os.rmdir(str(projectId))
+            return True
     return False
 
-def deleteProject(projectId):
+def removeProjectFolder(projectId):
+    os.rmdir(str(projectId))
+
+def deleteProject(msgId, projectId):
     deleted = False
     if(projectId in projects):
         #remove project
         projects.pop(projectId)
-        removeProjectFolderIfEmpty(projectId)
-        deleted = True
+        removeProjectFolder(projectId)
+    else:
+        print("Project ", projectId, " not found")
+        print("Contact DST about message: ", msgId)
 
 def generateUsername(accessId):
     return accessId
@@ -98,145 +109,208 @@ def generateUsername(accessId):
 def generateOTP():
     return ''.join(secrets.choice(alphabet) for i in range(passwordLength))
 
-def createProjectAccess(projectId, accessId):
+def createProjectAccess(msgId, projectId, accessId):
     if(projectId in projects):
         project = projects.get(projectId)
         #Create the user in the project
         if(not accessId in project):
-            project.append(accessId)
+            if (not accessId in users):
+                project.append(accessId)
+                username = generateUsername(accessId)
+                password = generateOTP()
+                enabled = True
+                users.update([(accessId,(projectId, username, password, enabled))])
+
+                #POST credentials back to DST
+                userData = {"accessIdentifier" : accessId, "loginName" : username, "oneTimePassword" : password }
+                url = static_url + "/user-accesses"
+                response = requests.post(url, headers=headers, json = userData)
+                try:
+                    response.raise_for_status()
+                except:
+                    print("Something went wrong posting ", username, " to DST while handling message id ", msgId)
+                    print("Please contact DST")
+            else:
+                print("User ", accessId, " already exists")
+                print("Contact DST about message: ", msgId)
+        else:
+            print("User already known in project: ", projectId)
+            print("Contact DST about message: ", msgId)
+            return
         #Add the user to the list of users
-        if (not accessId in users):
-            username = generateUsername(accessId)
-            password = generateOTP()
-            enabled = True
-            users.update([(accessId,(projectId, username, password, enabled))])
+    else:
+        print("Project ", projectId, " not found")
+        print("Contact DST about message: ", msgId)
 
-            #POST credentials back to DST
-            userData = {"accessIdentifier" : accessId, "loginName" : username, "oneTimePassword" : password }
-            url = static_url + "/user-accesses"
-            requests.post(url, auth=auth, json = userData).raise_for_status()
-
-def deleteProjectAccess(accessId):
+def deleteProjectAccess(msgId, accessId):
     if(accessId in users):
         (projectId, _, _, _) = users.pop(accessId)
         if(projectId in projects):
             project = projects.get(projectId)
             project.remove(accessId)
+        else:
+            print("Project ", projectId, " for user ", accessId, " not found")
+            print("Contact DST about message: ", msgId)
+    else:
+        print("User ", accessId, " not found")
+        print("Contact DST about message: ", msgId)
 
-def disableProjectAccess(accessId):
+def disableProjectAccess(msgId, accessId):
     if(accessId in users):
         (projectId, username, password, enabled) = users.get(accessId)
         if(enabled):
             users.update([(accessId,(projectId, username, password, False))])
+        else:
+            print("User ", accessId, " already disabled")
+            print("Contact DST about message: ", msgId)
+    else:
+        print("User ", accessId, " not found")
+        print("Contact DST about message: ", msgId)
 
-def enableProjectAccess(accessId):
+def enableProjectAccess(msgId, accessId):
     if(accessId in users):
         (projectId, username, password, enabled) = users.get(accessId)
         if(not enabled):
             users.update([(accessId,(projectId, username, password, True))])
+        else:
+            print("User ", accessId, " already ensabled")
+            print("Contact DST about message: ", msgId)
+    else:
+        print("User ", accessId, " not found")
+        print("Contact DST about message: ", msgId)
 
-def resetPassword(accessId):
+def resetPassword(msgId, accessId):
     if(accessId in users):
         (projectId, username, password, enabled) = users.get(accessId)
         users.update([(accessId,(projectId, username, generateOTP(), enabled))])
 
         #PATCH new OTP back to DST
         url = static_url + "/user-accesses/" + str(accessId)
-        requests.patch(url, password, auth=auth).raise_for_status()
+        try:
+            requests.patch(url, password, headers=headers).raise_for_status()
+        except:
+            print("Something went wrong patching a new password for ", username, " to DST while handling message id ", msgId)
+            print("Please contact DST")
+    else:
+        print("User ", accessId, " not found")
+        print("Contact DST about message: ", msgId)
+
+def verifyFile(destination, checksum):
+    #################################################################################Verify file versus MD5hash
 
 chunkSize = 8192
-def downloadLargeFile(url, destination):
+def downloadLargeFile(msgId, url, destination, checksum):
     try:
-        with requests.get(url, auth=auth, stream=True) as response:
+        with requests.get(url, headers=headers, stream=True) as response:
             response.raise_for_status()
             with open(destination, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=chunkSize):
                     f.write(chunk)
     except requests.exceptions.RequestException as e:
-        print("Error downloading the file:", e)
+        print("Error downloading the file:", e, " for message with id: ", msgId)
+    verifyFile(destination, checksum)
 
 def sendLargeFile(url, filePath):
     with open(filePath, 'rb') as f:
-        requests.post(url, auth=auth, data=f).raise_for_status()
+        reponse = requests.post(url, headers=headers, data=f).raise_for_status()
 
-def handleFileDelivery(projectId, fileId):
+
+def handleFileDelivery(msgId, projectId, fileId, checcksum):
     dirc = str(projectId)
-    os.makedirs(dirc)
+    if(not os.path.exists(dirc)):
+        os.makedirs(dirc)
     url = static_url + "/data/" + fileId
     path = dirc + fileId
-    downloadLargeFile(url, path)
+    downloadLargeFile(msgId, url, path, checksum)
 
 def findFileById(fileId):
     for root, dirs, files in os.walk("."):
         if fileId in files:
             return os.path.join(root, fileId)
 
-def dataDeliveryReady(projectId, files):
-    for fileId, fileSize, checksum in files:
-        handleFileDelivery(projectId, fileId)
+def dataDeliveryReady(msgId, projectId, files):
+    if(projectId in projects):
+        for fileId, fileSize, checksum in files:
+            handleFileDelivery(msgId, projectId, fileId, checksum)
+    else:
+        print("Project ", projectId, "does not exist while trying to download files")
+        print("Contact DST about message: ", msgId)
 
-def deleteDataFile(fileId):
+def deleteDataFile(msgId, fileId):
     optionalFilePath = findFileById(fileId)
     if(optionalFilePath):
         os.remove(optionalFilePath)
+    else:
+        print("File not found:", fileId)
+        print("Contact DST about message: ", msgId)
 
-def returnDataFile(fileId):
+def returnDataFile(msgId, fileId):
     optionalFilePath = findFileById(fileId)
     if(optionalFilePath):
         url = static_url + "/data/" + fileId
-        sendLargeFile(url, optionalFilePath)
+        try:
+            sendLargeFile(url, optionalFilePath, msgId)
+        except:
+            print("Sending file ", fileId, " failed")
+            print("Please contact DST about message ", msgId)
+    else:
+        print("File not found:", fileId)
+        print("Contact DST about message: ", msgId)
 
 def transferFile(filePath, projectNumber):
     url = static_url + "/data/project/" + projectNumber
     sendLargeFile(url, filePath)
 
 def handleIndividualMessage(messageType, msgId, data):
+    if(type(data)==str):
+        data = json.loads(data)
     match messageType:
         case "CreateProject":
             projectId = data[projectNumberPath]
-            createProject(projectId)
+            createProject(msgId, projectId)
 
         case "DeleteProject":
             projectId = data[projectNumberPath]
-            deleteProject(projectId)
+            deleteProject(msgId, projectId)
 
         case "CreateProjectAccess":
             projectId = data[projectNumberPath]
             accessId = data[accessIdPath]
-            createProjectAccess(projectId, accessId)
+            createProjectAccess(msgId, projectId, accessId)
 
         case "DeleteProjectAccess":
             accessId = data[accessIdPath]
-            deleteProjectAccess(accessId)
+            deleteProjectAccess(msgId, accessId)
 
         case "DisableProjectAccess":
             accessId = data[accessIdPath]
-            disableProjectAccess(accessId)
+            disableProjectAccess(msgId, accessId)
 
         case "EnableProjectAccess":
             accessId = data[accessIdPath]
-            enableProjectAccess(accessId)
+            enableProjectAccess(msgId, accessId)
 
         case "ResetPassword":
             accessId = data[accessIdPath]
-            resetPassword(accessId)
+            resetPassword(msgId, accessId)
 
         case "DataDeliveryReady":
             projectId = data[projectNumberPath]
             files = data[filesPath]
-            dataDeliveryReady(projectId, files)
+            dataDeliveryReady(msgId, projectId, files)
 
         case "DeleteDataFile":
             fileId = data[fileIdPath]
-            deleteDataFile(fileId)
+            deleteDataFile(msgId, fileId)
 
         case "ReturnDataFile":
             fileId = data[fileIdPath]
-            returnDataFile(fileId)
+            returnDataFile(msgId, fileId)
 
         case _:
             print("Unknown message type: ", messageType)
-            return #To not mark the message as done
+            print("Contact DST about message: ", msgId)
+            #return
 
     #mark as done
     messageDone(msgId)
@@ -245,12 +319,15 @@ def getMessageList(response):
     return json.loads(response.content)
 
 def handleMessageList(response):
+    print(response.content)
     messages = getMessageList(response)
     for message in messages:
+        print(message)
         messageType = message[messageTypePath]
         msgId = message[messageIdPath]
         data = message[dataPath]
         handleIndividualMessage(messageType, msgId, data)
+        printState()
     #DELETE ME
     if(len(messages)==0):
         print("No more messages - goodbye")
@@ -273,43 +350,45 @@ def handleGetMessageResponse(response):
 def initializeProject(projectId):
     path = "/projects/" + str(projectId) + "/confirm"
     url = static_url + path
-    response = requests.post(url, auth=auth)
+    response = requests.post(url, headers=headers)
     handleMessagePatchResponse(response, projectId)
 
-#####Create project
+# #####Create project
 projectId = 1337 #Is 42 funnier?
-initializeProject(projectId)
+# initializeProject(projectId)
 
-#####Get messages
+# #####Get messages
 path = "/messages"
 url=static_url+path
-response = requests.get(url, auth=auth)
-handleGetMessageResponse(response)
+while(true):
+    response = requests.get(url, headers=headers)
+    handleGetMessageResponse(response)
+    sleep(60) #One minutte as agreed with DST
 
 
 ### DELETE ME
-i = 0
-while(True):
-    i+=1
-    if(i<50):
-        for x in range(1):
-            initializeProject(projectId+x+i*50)
-    url=static_url+path
-    response = requests.get(url, auth=auth)
-    response = requests.get(url, auth=auth)
+# i = 0
+# while(True):
+#     i+=1
+#     if(i<50):
+#         for x in range(1):
+#             initializeProject(projectId+x+i*50)
+#     url=static_url+path
+#     response = requests.get(url, headers=headers)
+#     response = requests.get(url, headers=headers)
 
-    handleGetMessageResponse(response)
-    printState() #For debugging
-    time.sleep(1)
+#     handleGetMessageResponse(response)
+#     printState() #For debugging
+#     time.sleep(1)
 
 #####Send data to project from data-center
 
 # #Crteate some data
-# f = open("demofile", "w")
-# f.write("This is a test")
-# f.close()
+f = open("demofile", "w")
+f.write("This is a test")
+f.close()
 
 # #Actually do the transfer
-# projectId = 1337 #It's not. Is it?
-# path = "demofile"
-# transferFile(demofile, projectId)
+projectId = 1337 #It's not. Is it?
+path = "demofile"
+transferFile(demofile, projectId)
