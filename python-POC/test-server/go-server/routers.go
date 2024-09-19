@@ -69,9 +69,23 @@ var routes = Routes{
 	},
 
 	Route{
+		"DataLargeFileFileIdPost",
+		strings.ToUpper("Post"),
+		"/data/large-file/{fileId}",
+		DataFileIdPost,
+	},
+
+	Route{
 		"DataProjectProjectNoPost",
 		strings.ToUpper("Post"),
 		"/data/project/{projectNo}",
+		DataProjectProjectNoPost,
+	},
+
+	Route{
+		"DataLargeFileProjectNoPost",
+		strings.ToUpper("Post"),
+		"/data/project/{projectNo}/{fileId}",
 		DataProjectProjectNoPost,
 	},
 
@@ -102,34 +116,6 @@ var routes = Routes{
 		"/projects/{projectNo}/confirm",
 		ProjectsProjectNumberConfirmPost,
 	},
-
-	// Route{
-	// 	"TestMarkDeliveryReadyPost",
-	// 	strings.ToUpper("Post"),
-	// 	"/test/mark-delivery-ready",
-	// 	TestMarkDeliveryReadyPost,
-	// },
-
-	// Route{
-	// 	"TestMoveReceivedTransferFilePost",
-	// 	strings.ToUpper("Post"),
-	// 	"/test/move-received-transfer-file",
-	// 	TestMoveReceivedTransferFilePost,
-	// },
-
-	// Route{
-	// 	"TestRecallDeliveryPost",
-	// 	strings.ToUpper("Post"),
-	// 	"/test/recall-delivery",
-	// 	TestRecallDeliveryPost,
-	// },
-
-	// Route{
-	// 	"TestSynchronizePost",
-	// 	strings.ToUpper("Post"),
-	// 	"/test/synchronize",
-	// 	TestSynchronizePost,
-	// },
 
 	Route{
 		"UserAccessesAccessIdentifierPatch",

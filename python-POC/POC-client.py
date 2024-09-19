@@ -8,7 +8,7 @@ import time
 
 #####STATIC VALUES
 static_url = "http://srvhpcstg1.fsehpcdmz.local/HPCApiPreprod"
-#static_url = "http://localhost:8080"
+static_url = "http://localhost:8080"
 
 apikey = "DeiCApiKey"
 headers = {"X-API-Key": apikey}
@@ -21,6 +21,8 @@ projectNumberPath = "projectNo"
 accessIdPath = "accessIdentifier"
 filesPath = "files"
 fileIdPath = "fileId"
+fileChecksumPath = "fileChecksum"
+fileSizePath = "fileSize"
 
 #Password static variables
 alphabet = string.ascii_letters + string.digits + string.punctuation
@@ -68,7 +70,6 @@ def handleMessagePatchResponse(response, msgId):
             return False
 
 def messageDone(msgId):
-    return
     path = "/messages/" + str(msgId)
     url = static_url + path
     response = requests.patch(url, headers=headers)
@@ -182,14 +183,26 @@ def enableProjectAccess(msgId, accessId):
 def resetPassword(msgId, accessId):
     if(accessId in users):
         (projectId, username, password, enabled) = users.get(accessId)
-        users.update([(accessId,(projectId, username, generateOTP(), enabled))])
+        newPassword =  generateOTP()
+        users.update([(accessId,(projectId, username, newPassword, enabled))])
 
         #PATCH new OTP back to DST
         url = static_url + "/user-accesses/" + str(accessId)
         try:
-            requests.patch(url, password, headers=headers).raise_for_status()
+            patchPassword = "\""+newPassword+"\""
+
+            #Merge content type into the headers for this request only
+            patchHeaders = headers | {"Content-Type": "application/json"}
+
+            patchResponse = requests.patch(url, data=patchPassword, headers=patchHeaders)
+            patchResponse.raise_for_status()
+            #DELETE ME
+            request = patchResponse.request
+            print("The request sent to DST: url: ", request.url, " header: ", request.headers, " body: ", request.body)
         except:
+            request = patchResponse.request
             print("Something went wrong patching a new password for ", username, " to DST while handling message id ", msgId)
+            print("The request sent to DST: url: ", request.url, " header: ", request.headers, " body: ", request.body)
             print("Please contact DST")
     else:
         print("User ", accessId, " not found")
@@ -197,6 +210,7 @@ def resetPassword(msgId, accessId):
 
 def verifyFile(destination, checksum):
     #################################################################################Verify file versus MD5hash
+    return True
 
 chunkSize = 8192
 def downloadLargeFile(msgId, url, destination, checksum):
@@ -215,12 +229,12 @@ def sendLargeFile(url, filePath):
         reponse = requests.post(url, headers=headers, data=f).raise_for_status()
 
 
-def handleFileDelivery(msgId, projectId, fileId, checcksum):
+def handleFileDelivery(msgId, projectId, fileId, checksum):
     dirc = str(projectId)
     if(not os.path.exists(dirc)):
         os.makedirs(dirc)
     url = static_url + "/data/" + fileId
-    path = dirc + fileId
+    path = dirc + "/" +  fileId
     downloadLargeFile(msgId, url, path, checksum)
 
 def findFileById(fileId):
@@ -230,7 +244,10 @@ def findFileById(fileId):
 
 def dataDeliveryReady(msgId, projectId, files):
     if(projectId in projects):
-        for fileId, fileSize, checksum in files:
+        for fileValues in files:
+            fileId = fileValues[fileIdPath]
+            fileSize = fileValues[fileSizePath]
+            checksum = fileValues[fileChecksumPath]
             handleFileDelivery(msgId, projectId, fileId, checksum)
     else:
         print("Project ", projectId, "does not exist while trying to download files")
@@ -264,6 +281,7 @@ def transferFile(filePath, projectNumber):
 def handleIndividualMessage(messageType, msgId, data):
     if(type(data)==str):
         data = json.loads(data)
+    print(data)
     match messageType:
         case "CreateProject":
             projectId = data[projectNumberPath]
@@ -319,10 +337,8 @@ def getMessageList(response):
     return json.loads(response.content)
 
 def handleMessageList(response):
-    print(response.content)
     messages = getMessageList(response)
     for message in messages:
-        print(message)
         messageType = message[messageTypePath]
         msgId = message[messageIdPath]
         data = message[dataPath]
@@ -330,8 +346,7 @@ def handleMessageList(response):
         printState()
     #DELETE ME
     if(len(messages)==0):
-        print("No more messages - goodbye")
-        exit()
+        print("No more messages")
 
 def handleGetMessageResponse(response):
     match response.status_code:
@@ -354,16 +369,17 @@ def initializeProject(projectId):
     handleMessagePatchResponse(response, projectId)
 
 # #####Create project
-projectId = 1337 #Is 42 funnier?
-# initializeProject(projectId)
+#projectId = 1337 #Is 42 funnier?
+projectId = 702483
+initializeProject(projectId)
 
 # #####Get messages
 path = "/messages"
 url=static_url+path
-while(true):
+while(True):
     response = requests.get(url, headers=headers)
     handleGetMessageResponse(response)
-    sleep(60) #One minutte as agreed with DST
+    time.sleep(1) #One minutte as agreed with DST
 
 
 ### DELETE ME

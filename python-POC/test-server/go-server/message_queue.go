@@ -9,7 +9,6 @@
 package swagger
 
 import (
-	// "fmt"
 	"time"
 	"strconv"
 )
@@ -148,7 +147,7 @@ func generateMessage(msg CreateMessage) Data{
 		messageType = RESET_PASSWORD
 		dataMap["accessIdentifier"] = msg.value
 
-		nextMessage = generateDataDeliveryReady("Test",msg.projectNumber,"TestFile","1","0", msg.accessIdentifier)
+		nextMessage = generateDataDeliveryReady("Test",msg.projectNumber,"TestFile"+msg.projectNumber,"1","0", msg.accessIdentifier)
 
 		case 7:
 		messageType = DATA_DELIVERY_READY
@@ -160,6 +159,7 @@ func generateMessage(msg CreateMessage) Data{
 		var filesMap []map[string]string
 		file := make(map[string]string)
 		file["fileId"] = value.fileId
+		addAvailableFile(value.fileId)
 		file["fileSize"] = value.fileSize
 		file["fileChecksum"] = value.checkSum
 		filesMap =append(filesMap, file)

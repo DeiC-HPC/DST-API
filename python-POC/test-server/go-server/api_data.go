@@ -10,11 +10,29 @@ package swagger
 
 import (
 	"net/http"
+	"slices"
+
+	"github.com/gorilla/mux"
 )
 
+var availableFiles []string = []string{}
+
+var returnFiles []string = []string{}
+
+func addAvailableFile(fileId string){
+	availableFiles = append(availableFiles, fileId)
+	//Maybe create a file?
+}
+
 func DataFileIdGet(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(http.StatusOK)
+	var fileId string = mux.Vars(r)["fileId"]
+	if(slices.Contains(availableFiles, fileId)){
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		w.WriteHeader(http.StatusOK)
+	} else {
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		w.WriteHeader(http.StatusNotFound)
+	}
 }
 
 func DataFileIdPost(w http.ResponseWriter, r *http.Request) {

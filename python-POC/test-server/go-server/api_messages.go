@@ -12,26 +12,10 @@ import (
 	"fmt"
 	"net/http"
 	"encoding/json"
-	"strings"
 	"strconv"
-)
 
-// var MESSAGELISTORDERING []CreateMessage = []CreateMessage{
-// 	generateCreateProject("1337"),
-// 	generateCreateProjectAccess("1337","Test"),
-// 	generateDisableProjectAccess("Test"),
-// 	generateEnableProjectAccess("Test"),
-// 	generateResetPassword("Test"),
-// 	generateDataDeliveryReady(
-// 		"DeliveryId",
-// 		"1337",
-// 		"File",
-// 		"1",
-// 		"0"),
-// 	generateDeleteDataFile("File"),
-// 	generateReturnDataFile("File"),
-// 	generateDeleteProjectAccess("Test"),
-// 	generateDeleteProject("1337")}
+	"github.com/gorilla/mux"
+)
 
 func getMessages() []Data{
 	data := generateMessages()
@@ -44,30 +28,47 @@ func MessagesGet(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(getMessages())
 }
 
-func MessagesIdPatch(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	messageIdString := strings.Split(r.RequestURI, "/messages/")[1]
-	messageId, err := strconv.Atoi(messageIdString)
-	if err != nil {
-		fmt.Println("Error converting the following messageId to an integer: ", err)
-	}
-
+func popMessageInQueue(id int) bool{
 	//Look only for the first message in the confirmQueue
-	if(confirmQueue != nil && confirmQueue[0].queue == messageId){
+	if(confirmQueue != nil && confirmQueue[0].queue == id){
 		nextMessage := confirmQueue[0].nextMessage
 		//If value is nil then the message is not instantiated and we are done in this round
 		if(nextMessage.value != nil){
 			updateMessageQueue(nextMessage)
 		}
-		w.WriteHeader(http.StatusOK)
 		confirmQueue = confirmQueue[1:]
 		messageQueue = messageQueue[1:]
+		return true
+	} else {
+		return false
+	}
+}
+
+func MessagesIdPatch(w http.ResponseWriter, r *http.Request) {
+	messageIdString := mux.Vars(r)["id"]
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	messageId, err := strconv.Atoi(messageIdString)
+	if err != nil {
+		fmt.Println("Error converting the following messageId to an integer: ", err)
+	}
+	if(popMessageInQueue(messageId)){
+		w.WriteHeader(http.StatusOK)
 	} else {
 		w.WriteHeader(http.StatusNotFound)
 	}
 }
 
 func MessagesPatch(w http.ResponseWriter, r *http.Request) {
+	var messageList []int
+	err := json.NewDecoder(r.Body).Decode(&messageList)
+	if err != nil {
+		fmt.Println(err)
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusNotImplemented)
+		return
+	}
+	fmt.Println(messageList)
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusNotImplemented)
 }

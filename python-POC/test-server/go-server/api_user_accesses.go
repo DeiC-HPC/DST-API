@@ -9,10 +9,20 @@
 package swagger
 
 import (
+	"fmt"
+	"encoding/json"
 	"net/http"
 )
 
 func UserAccessesAccessIdentifierPatch(w http.ResponseWriter, r *http.Request) {
+	var pwd string
+	err := json.NewDecoder(r.Body).Decode(&pwd)
+	if err != nil {
+		fmt.Println(err)
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusOK)
 }
