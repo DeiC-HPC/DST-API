@@ -1,5 +1,4 @@
 import requests
-from requests.auth import HTTPBasicAuth
 import os
 import string
 import secrets
@@ -7,10 +6,9 @@ import json
 import time
 
 #####STATIC VALUES
-static_url = "http://srvhpcstg1.fsehpcdmz.local/HPCApiPreprod"
-static_url = "http://localhost:8080"
+static_url = "http://localhost:8080" #Test-url
 
-apikey = "DeiCApiKey"
+apikey = "<INSERT API-KEY>"
 headers = {"X-API-Key": apikey}
 
 #Static variables for getting data from the messages
@@ -25,7 +23,7 @@ fileChecksumPath = "fileChecksum"
 fileSizePath = "fileSize"
 
 #Password static variables
-alphabet = string.ascii_letters + string.digits + string.punctuation
+alphabet = string.ascii_letters + string.digits
 passwordLength = 10
 
 #projects is a dictionary of projects. Each project will contain a list of user-id's
@@ -116,6 +114,7 @@ def createProjectAccess(msgId, projectId, accessId):
         #Create the user in the project
         if(not accessId in project):
             if (not accessId in users):
+                #Add the user to the list of users
                 project.append(accessId)
                 username = generateUsername(accessId)
                 password = generateOTP()
@@ -137,8 +136,6 @@ def createProjectAccess(msgId, projectId, accessId):
         else:
             print("User already known in project: ", projectId)
             print("Contact DST about message: ", msgId)
-            return
-        #Add the user to the list of users
     else:
         print("Project ", projectId, " not found")
         print("Contact DST about message: ", msgId)
@@ -196,13 +193,8 @@ def resetPassword(msgId, accessId):
 
             patchResponse = requests.patch(url, data=patchPassword, headers=patchHeaders)
             patchResponse.raise_for_status()
-            #DELETE ME
-            request = patchResponse.request
-            print("The request sent to DST: url: ", request.url, " header: ", request.headers, " body: ", request.body)
         except:
-            request = patchResponse.request
             print("Something went wrong patching a new password for ", username, " to DST while handling message id ", msgId)
-            print("The request sent to DST: url: ", request.url, " header: ", request.headers, " body: ", request.body)
             print("Please contact DST")
     else:
         print("User ", accessId, " not found")
@@ -224,10 +216,11 @@ def downloadLargeFile(msgId, url, destination, checksum):
         print("Error downloading the file:", e, " for message with id: ", msgId)
     verifyFile(destination, checksum)
 
-def sendLargeFile(url, filePath):
-    with open(filePath, 'rb') as f:
-        reponse = requests.post(url, headers=headers, data=f).raise_for_status()
-
+def sendLargeFile(url, filePath, fileId):
+    files = {"DataFile": (fileId, open(filePath,'rb'))}
+    response = requests.post(url, headers=headers, files=files)
+    print(response.request.headers)
+    response.raise_for_status()
 
 def handleFileDelivery(msgId, projectId, fileId, checksum):
     dirc = str(projectId)
@@ -266,7 +259,7 @@ def returnDataFile(msgId, fileId):
     if(optionalFilePath):
         url = static_url + "/data/" + fileId
         try:
-            sendLargeFile(url, optionalFilePath, msgId)
+            sendLargeFile(url, optionalFilePath, fileId)
         except:
             print("Sending file ", fileId, " failed")
             print("Please contact DST about message ", msgId)
@@ -274,9 +267,10 @@ def returnDataFile(msgId, fileId):
         print("File not found:", fileId)
         print("Contact DST about message: ", msgId)
 
-def transferFile(filePath, projectNumber):
-    url = static_url + "/data/project/" + projectNumber
-    sendLargeFile(url, filePath)
+def transferFile(fileName, projectNumber):
+    url = static_url + "/data/project/" + str(projectNumber)
+    filePath = str(projectId) + "/" + str(fileName)
+    sendLargeFile(url, filePath, fileName)
 
 def handleIndividualMessage(messageType, msgId, data):
     if(type(data)==str):
@@ -343,10 +337,8 @@ def handleMessageList(response):
         msgId = message[messageIdPath]
         data = message[dataPath]
         handleIndividualMessage(messageType, msgId, data)
-        printState()
-    #DELETE ME
     if(len(messages)==0):
-        print("No more messages")
+        print("No messages on queue")
 
 def handleGetMessageResponse(response):
     match response.status_code:
@@ -361,41 +353,31 @@ def handleGetMessageResponse(response):
         case _:
             print("Unknown status code: ", response.status_code)
 
-
 def initializeProject(projectId):
     path = "/projects/" + str(projectId) + "/confirm"
     url = static_url + path
     response = requests.post(url, headers=headers)
     handleMessagePatchResponse(response, projectId)
 
-# #####Create project
+
+
+#####Create project
 #projectId = 1337 #Is 42 funnier?
-projectId = 702483
+projectId = 702582
+projects.update([(projectId,[])])
 initializeProject(projectId)
 
-# #####Get messages
+
+
+#####Get messages
 path = "/messages"
 url=static_url+path
 while(True):
     response = requests.get(url, headers=headers)
     handleGetMessageResponse(response)
-    time.sleep(1) #One minutte as agreed with DST
+    time.sleep(60) #One minutte as agreed with DST
 
 
-### DELETE ME
-# i = 0
-# while(True):
-#     i+=1
-#     if(i<50):
-#         for x in range(1):
-#             initializeProject(projectId+x+i*50)
-#     url=static_url+path
-#     response = requests.get(url, headers=headers)
-#     response = requests.get(url, headers=headers)
-
-#     handleGetMessageResponse(response)
-#     printState() #For debugging
-#     time.sleep(1)
 
 #####Send data to project from data-center
 
@@ -406,5 +388,6 @@ f.close()
 
 # #Actually do the transfer
 projectId = 1337 #It's not. Is it?
-path = "demofile"
-transferFile(demofile, projectId)
+fileId = "demofile"
+
+transferFile(fileId, projectId)
