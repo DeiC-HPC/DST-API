@@ -1,8 +1,9 @@
-import requests
-import os
-import string
-import secrets
 import json
+import hashlib
+import os
+import requests
+import secrets
+import string
 import time
 
 #####STATIC VALUES
@@ -200,9 +201,19 @@ def resetPassword(msgId, accessId):
         print("User ", accessId, " not found")
         print("Contact DST about message: ", msgId)
 
+def getMd5(filePath):
+    hash_md5 = hashlib.md5()
+    with open(filePath, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
 def verifyFile(destination, checksum):
-    #################################################################################Verify file versus MD5hash
-    return True
+    md5 = getMd5(destination)
+    res = md5 == checksum
+    if(not res):
+        print("Checksum for file: ", destination, " did not match the given checksum of: ", checksum)
+    return res
 
 chunkSize = 8192
 def downloadLargeFile(msgId, url, destination, checksum):
@@ -275,7 +286,6 @@ def transferFile(fileName, projectNumber):
 def handleIndividualMessage(messageType, msgId, data):
     if(type(data)==str):
         data = json.loads(data)
-    print(data)
     match messageType:
         case "CreateProject":
             projectId = data[projectNumberPath]
@@ -362,9 +372,7 @@ def initializeProject(projectId):
 
 
 #####Create project
-#projectId = 1337 #Is 42 funnier?
-projectId = 702582
-projects.update([(projectId,[])])
+projectId = 1337 #Is 42 funnier?
 initializeProject(projectId)
 
 
@@ -375,7 +383,7 @@ url=static_url+path
 while(True):
     response = requests.get(url, headers=headers)
     handleGetMessageResponse(response)
-    time.sleep(60) #One minutte as agreed with DST
+    time.sleep(1) #One minutte as agreed with DST
 
 
 
