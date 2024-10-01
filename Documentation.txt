@@ -1,0 +1,62 @@
+POC-client.py is built in a simple manner to show an example of to use the DST swagger API.
+It is not made to be ready-to-use but as a piece of code to guide the development of implementations at the different HPC-centers that want to use the API. It does very little to validate data formats and is not suitable for production. Please use it as an example and not as a solution.
+
+The start of the file contains a set of static values to simplify the implementation, fx. the url to the server, a header containing the api-key and the name of several fields in the json-object.
+
+Because projects and users both need to be searchable we have created two dictionaries - one a dict of projects which each contains a list of user-ids, the second a dict of users cotaining certain values pertaining to the user, eg: project-id, username, password and wether or not the user is enabled.
+These two dictionaries are the database of the program.
+
+### HANDLING THE MESSAGE-QUEUE ###
+
+The bulk of the program contains a series of functions to handle the different functionalities of the API.
+
+The sequential program after these functions goes as follows:
+The project is initialized using initializeProject which sends the confirmProjectNo message to the server and verifies the response.
+After this the program requests a list of messages from the server and handles the response using handleGetMessageResponse.
+handleGetMessageResponse checks the status code and if the status code is 200 as expected the response is passed to handleMessageList.
+handleMessageList parses the content of the response into a python representation of the json-data and then handles each message individually. For each message the message-type, message-id and message-data is retreived and passed to the handleIndividualMessage-function.
+
+handleIndividualMessage is based around a large switch case based on the message-type. For each message-type it retrieves the relevant data and calls the relevant function after which it sends a message to mark the message as done.
+
+General notes on the handling:
+Any message that does not fit the current state of the program (e.g. deleting a project that is not there, creating a project which already exists, changing permissions for a user that does not exist) should provoke an error message to contact DST to figure out what is wrong.
+For these cases of errorhandling we pass along the message-id to the different parts of the program, even if it is not otherwise needed.
+
+createProject checks if the project is there and instantiates the project if it is not.
+error-scenarios: the project is already in the database.
+
+deleteProjecct checks if the project exists and if it does it will delete any data related to the project.
+error-scenarios: the project does not exist.
+
+createProjectAccess is used to create a new user for a project.
+It starts by finding the project in the project and checking for the existence of the user, adding the user to the project, then generates a username using generateUsername (currently just uses the access-id), generate a random OTP, and mark the user as enabled. Once this has been initialized we send the data back to DST on the "/user-accesses" with a post-request containing access-id, username and OTP.
+error-scenarios: project does not exist, user exists - either in project or users-list, posting of credentials fails.
+
+deleteProjectAccess removes the record of a user, both from the project and from the list of users. It does so by popping the record from the user-list and getting the project-id to then remove the user from the project.
+error-scenarios: user does not exist, project does not exist.
+
+diableProjectAccess disables the user by finding the user in the list of users and updating the enabled boolean to be false.
+error-scenarios: user does not exist, user is already disabled.
+
+enableProjectAccess enables the user by finding the user in the list of users and updating the enabled boolean to be true.
+error-scenarios: user does not exist, user is already enabled.
+
+resetPassword finds the user in the list of users, updates the password and sends a patch-request to DST to update the password.
+error-scenarios: user does not exist, error sending the patch request to DST.
+
+dataDeliveryReady takes in a list of files to handle. First it checks that the project exists and then for each file the file-id, file size and checksum are extracted from the list and passed to the handleFileDelivery function.
+handleFileDelivery checks if the directory already exists, if not it creates it and then passes the proper URL to downloadLargeFile.
+downloadLargeFile downloads the given file and then verifies the file using the checksum.
+error-scenarios: project does not exist, downloading a file fails.
+
+deleteDataFile looks for the file in the folder structure, if the file is found it is deleted.
+error-scenarios: file does not exist.
+
+returnDataFile looks for the file in the folder structure, if the file is found it is posted back to DST.
+error-scenarios: file does not exist, sending file fails.
+
+messageDone takes in the message-id and sends in a patch-message to the server to mark the specifik message as done and checks the status code of the response. If the response is not as expected then it returns false although nothing is currently done with this value.
+
+As the finish of the program we send in a file to mark the posting of data in the researchers space at DST.
+transferFile takes in a file path and sends the file to DST via a post-request.
+error-scenarios: sending file fails.
